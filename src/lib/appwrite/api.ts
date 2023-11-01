@@ -1,6 +1,6 @@
 
 import { ID, Query } from 'appwrite'
-import { INewPost, INewUser } from "@/types/indes";
+import { INewPost, INewUser, IUpdatePost } from "@/types/indes";
 import { account, appwriteConfig, avatars, databases , storage } from './config';
 
 
@@ -122,11 +122,11 @@ export async function createPost(post: INewPost) {
 
      // Create post
      const newPost = await databases.createDocument(
-       appwriteConfig.databaseId,
-       appwriteConfig.postCollectionId,
-       ID.unique(),
-       {
-        creator: post.userId,
+      appwriteConfig.databaseId,
+      appwriteConfig.postCollectionId,
+      ID.unique(),
+      {
+        creators: post.userId,
         caption: post.caption,
         imageUrl: fileUrl,
         imageId: uploadedFile.$id,
@@ -158,7 +158,7 @@ export async function uploadFile(file: File) {
     console.log(error);
   }
 }
-
+//it should not be an async function//
 export function getFilePreview(fileId: string) {
   try {
     const fileUrl = storage.getFilePreview(
@@ -183,6 +183,137 @@ export async function deleteFile(fileId: string) {
     await storage.deleteFile(appwriteConfig.storageId, fileId);
 
     return { status: "ok" };
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+
+export async function getRecentPosts(){
+  const posts = await databases.listDocuments(
+    appwriteConfig.databaseId,
+    appwriteConfig.postCollectionId,
+    [Query.orderDesc(`$createdAt`), Query.limit(20)]
+  )
+
+  if(!posts) throw Error;
+  
+  return posts;
+}
+
+
+export async function likePost(postId: string, likesArray: string[]){
+  try{
+     const updatedPost = await databases.updateDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.postCollectionId,
+      postId,
+      {
+        likes: likesArray,
+      }
+     )
+     if(!updatedPost) throw Error;
+
+     return updatedPost;
+  }catch (error){
+    console.log(error)
+  }
+}
+
+export async function savePost(postId: string, userId: string){
+  try{
+     const updatedPost = await databases.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.savesCollectionId,
+      ID.unique(),
+      {
+        user: userId,
+        post: postId,
+      }
+     )
+     if(!updatedPost) throw Error;
+
+     return updatedPost;
+  }catch (error){
+    console.log(error)
+  }
+}
+
+export async function deleteSavedPost(savedRecordId: string){
+  try{
+     const statusCode = await databases.deleteDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.savesCollectionId,
+       savedRecordId,
+     )
+     if(!statusCode) throw Error;
+
+     return {status : 'ok'};
+  }catch (error){
+    console.log(error)
+  }
+}
+
+
+export async function getPostById(postId: string){
+   try{
+      const post = await databases.getDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.postCollectionId,
+        postId,
+      )
+      return post;
+   } catch (error){
+    console.log(error)
+   }
+}
+
+
+export async function updatePost(post: IUpdatePost) {
+  const hasFileToUpdate = post.file.length > 0
+  try {
+      
+    let image = {
+      imageUrl: post.imageUrl,
+      imageId: post.imageId,
+    }
+
+    if(hasFileToUpdate){
+       // Upload file to appwrite storage
+       const uploadedFile = await uploadFile(post.file[0]);
+       if (!uploadedFile) throw Error;
+
+          // Get file url
+      const fileUrl = getFilePreview(uploadedFile.$id);
+      if (!fileUrl) {
+      await deleteFile(uploadedFile.$id);
+      throw Error;
+      }
+      image = {...image, imageUrl: fileUrl, imageId: uploadedFile.$id}
+    }
+  
+     // Convert tags into array
+     const tags = post.tags?.replace(/ /g, "").split(",") || [];
+
+     // Create post
+     const updatedPost = await databases.updateDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.postCollectionId,
+      post.postId,
+      {
+        caption: post.caption,
+        imageUrl: image.imageUrl,
+        imageId: image.imageId,
+        location: post.location,
+        tags: tags,
+      }
+    );
+    if (!updatedPost) {
+      await deleteFile(post.imageId);
+      throw Error;
+    }
+
+    return updatedPost;
   } catch (error) {
     console.log(error);
   }

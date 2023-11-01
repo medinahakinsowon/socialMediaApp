@@ -8,7 +8,7 @@ export const appwriteConfig = {
   storageId : '653cc8d07b9b44f9f641',
   userCollectionId : '653ccb1c13b9e90fc9bb',
   postCollectionId : '653cc9d6e4e530cc367b',
-  saveCollectionId : '653cccaf6edfd64a1b16',
+  savesCollectionId : '653cccaf6edfd64a1b16',
 }
 
 
